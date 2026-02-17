@@ -345,4 +345,5 @@ func main() {
 
 	r.HandleFunc("/branch/{id}", DeleteBranch).Methods("DELETE")
 	log.Fatal(http.ListenAndServe(":8000", r))
+	fmt.Println("Старт программы")
 }
