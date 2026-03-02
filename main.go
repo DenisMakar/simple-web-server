@@ -2,50 +2,52 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
-	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
 type Branch struct {
-	ID   int    `json:"id"`
+	ID   string    `json:"id"`
 	Name string `json:"name"`
 }
 
 type Category struct {
-	ID       int    `json:"id"`
-	BranchId int    `json:"branchId"`
+	ID       string    `json:"id"`
+	BranchId string    `json:"branchId"`
 	Name     string `json:"name"`
 
-	Branch *Branch `json:"BranchId"`
+	Branch *Branch `json:"Branch"`
 }
 
 type Product struct {
-	ID          int    `json:"id"`
-	CategoryId  int    `json:"categoryId"`
+	ID          string    `json:"id"`
+	CategoryId  string    `json:"categoryId"`
 	Name        string `json:"name"`
 	Price       int    `json:"price"`
 	Description string `json:"description"`
 
-	Category *Category `json:"CategoryId"`
+	Category *Category `json:"Category"`
 }
 
-var products []Product
-var categorys []Category
-var branchs []Branch
+var productMap map[string]Product
+// var products []Product
+var categories map[string]Category
+var branches map[string]Branch
+
 
 // Функция создания Branch (ветки)
 func CreateBranch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var branch Branch
 	json.NewDecoder(r.Body).Decode(&branch)
-	branch.ID = rand.Intn(1000000)
-	branchs = append(branchs, branch)
+	branch.ID = uuid.New().String()
+	branches[branch.ID] = branch
 	json.NewEncoder(w).Encode(branch)
+
+	defer r.Body.Close()
 }
 
 // Функция создания Category (категории)
@@ -55,27 +57,20 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&category)
 
 	// проверка существует ли branch с ID
-	var foundBranch *Branch
-	for i := range branchs {
-		if branchs[i].ID == category.BranchId {
-			foundBranch = &branchs[i]
-			break
-		}
-	}
-// Проверка существования Branch
-	if foundBranch == nil{
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "Ветки с ID нет",
-		})
+	branch, exist := branches[category.BranchId]
+	if !exist{
+		http.Error(w, "Branch с ID "+category.BranchId+"не найдено", http.StatusBadRequest)
 		return
 	}
 
-	category.ID = rand.Intn(1000000)
-	category.Branch = foundBranch
-	categorys = append(categorys, category)
+	category.Branch = &branch
+	category.ID = uuid.New().String()
+	categories[category.ID] = category
+
+	// w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(category)
 
+	defer r.Body.Close()
 }
 
 // Функция создания Product
@@ -84,69 +79,63 @@ func CreatProduct(w http.ResponseWriter, r *http.Request) {
 	var product Product
 	json.NewDecoder(r.Body).Decode(&product)
 
-	
-	var foundCategory *Category
-	for i:= range categorys {
-		if categorys[i].ID == product.CategoryId{
-			foundCategory = &categorys[i]
-			break
-		}
-	}
-
-	// Проверка существования Category
-	if foundCategory ==  nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Категории с ID нет"})
+	category, exist := categories[product.CategoryId]
+	if !exist{
+		http.Error(w, "Category с ID "+product.CategoryId+"не найдено", http.StatusBadRequest)
 		return
 	}
 
-	product.ID = (rand.Intn(1000000))
-	product.Category = foundCategory
-	products = append(products, product)
+
+	product.ID = uuid.New().String()
+	product.Category = &category
+	productMap[product.ID] = product
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(product)
+
+	defer r.Body.Close()
 }
 
 
 func getBranch(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
-	id, _ := strconv.Atoi(params["id"])
-	for _, item := range branchs{
-		if item.ID == id{
-			json.NewEncoder(w).Encode(item)
-			return
-		}
+	id := params["id"]
+
+	branch, exist := branches[id]
+	if !exist{
+		http.Error(w, "Branch с ID "+id+"не найдено", http.StatusBadRequest)
+		return
 	}
-	json.NewEncoder(w).Encode(branchs)
+	json.NewEncoder(w).Encode(branch)
+	json.NewEncoder(w).Encode(branches)
 
 }
 
 func getCatagory(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
-	id, _ := strconv.Atoi(params["id"])
-	for _, item := range categorys{
-		if item.ID == id{
-			json.NewEncoder(w).Encode(item)
-			return
-		}
+	id := params["id"]
+	category, exist := categories[id]
+	if !exist{
+		http.Error(w, "Category с ID "+id+"не найдено", http.StatusBadRequest)
+		return
 	}
-	json.NewEncoder(w).Encode(categorys)
-
+	json.NewEncoder(w).Encode(category)
+	json.NewEncoder(w).Encode(categories)
 }
 
 // Функция getProduct будет показывать книгу по опрделенному ID
 func getProduct(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
-	id, _ := strconv.Atoi(params["id"])
-	for _, item := range products {
-		if item.ID == id {
-			json.NewEncoder(w).Encode(item)
-			return
-		}
+	id := params["id"]
+	product, exist := categories[id]
+	if !exist{
+		http.Error(w, "Product с ID "+id+"не найдено", http.StatusBadRequest)
+		return
 	}
-	json.NewEncoder(w).Encode(products)
+	json.NewEncoder(w).Encode(product)
+	json.NewEncoder(w).Encode(productMap)
 }
 
 
@@ -154,38 +143,21 @@ func UpdateBranch(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 
 	params := mux.Vars(r)
-	id, err := strconv.Atoi(params["id"])
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid ID"})
-		return
-	}
-
+	id := params["id"]
+	
 	var updateBranch Branch
 	if err := json.NewDecoder(r.Body).Decode(&updateBranch); err != nil{
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid json"})
 		return
 	} 
-	
-	found := false
-	for i, branch := range branchs{
-		if branch.ID == id{
-			updateBranch.ID = id
-
-			branchs[i] = updateBranch
-			found = true
-
-			json.NewEncoder(w).Encode(updateBranch)
-			break
-		}
+	_, exist := branches[id]
+	if !exist{
+		http.Error(w, "Branch с ID "+id+"не найдено", http.StatusBadRequest)
+		return
 	}
 
-	if !found{
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Branch with ID %d not found", id)})
-	}
-
+	json.NewEncoder(w).Encode(updateBranch)
 	
 }
 
@@ -193,12 +165,7 @@ func UpdateCategory(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 
 	params := mux.Vars(r)
-	id, err := strconv.Atoi(params["id"])
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid ID"})
-		return
-	}
+	id := params["id"]
 
 	var updateCategory Category
 	if err := json.NewDecoder(r.Body).Decode(&updateCategory); err != nil{
@@ -207,25 +174,13 @@ func UpdateCategory(w http.ResponseWriter, r *http.Request){
 		return
 	} 
 	
-	found := false
-	for i, category := range categorys{
-		if category.ID == id{
-			updateCategory.ID = id
-
-			categorys[i] = updateCategory
-			found = true
-
-			json.NewEncoder(w).Encode(updateCategory)
-			break
-		}
+	_, exist := categories[id]
+	if !exist{
+		http.Error(w, "Category с ID "+id+"не найдено", http.StatusBadRequest)
+		return
 	}
-
-	if !found{
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Category with ID %d not found", id)})
-	}
-
-	
+	json.NewEncoder(w).Encode(updateCategory)
+			
 }
 
 
@@ -233,12 +188,7 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 
 	params := mux.Vars(r)
-	id, err := strconv.Atoi(params["id"])
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid ID"})
-		return
-	}
+	id := params["id"]
 
 	var updateProduct Product
 	if err := json.NewDecoder(r.Body).Decode(&updateProduct); err != nil{
@@ -247,82 +197,48 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request){
 		return
 	} 
 	
-	found := false
-	for i, product := range products{
-		if product.ID == id{
-			updateProduct.ID = id
-
-			products[i] = updateProduct
-			found = true
-
-			json.NewEncoder(w).Encode(updateProduct)
-			break
-		}
+	_, exist := categories[id]
+	if !exist{
+		http.Error(w, "Product с ID "+id+"не найдено", http.StatusBadRequest)
+		return
 	}
-
-	if !found{
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Product with ID %d not found", id)})
-	}
-
+	json.NewEncoder(w).Encode(updateProduct)
 	
 }
 
 func DeleteBranch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	
-	id, err := strconv.Atoi(mux.Vars(r)["id"])
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid ID"})
-		return
-	}
-	
-	// Проверяем существование ветки
-	found := false
-	for _, b := range branchs {
-		if b.ID == id {
-			found = true
-			break
-		}
-	}
-	
-	if !found {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Branch not found"})
-		return
-	}
-	
-	// 1. Удаляем продукты
-	for i := len(products) - 1; i >= 0; i-- {
-		for _, cat := range categorys {
-			if cat.ID == products[i].CategoryId && cat.BranchId == id {
-				products = append(products[:i], products[i+1:]...)
-				break
-			}
-		}
-	}
-	
-	// 2. Удаляем категории  
-	for i := len(categorys) - 1; i >= 0; i-- {
-		if categorys[i].BranchId == id {
-			categorys = append(categorys[:i], categorys[i+1:]...)
-		}
-	}
-	
-	// 3. Удаляем ветку
-	for i := len(branchs) - 1; i >= 0; i-- {
-		if branchs[i].ID == id {
-			branchs = append(branchs[:i], branchs[i+1:]...)
-			json.NewEncoder(w).Encode(map[string]string{
-				"message": "Branch and all related data deleted",
-			})
-			return
-		}
-	}
+	id := mux.Vars(r)["id"]
+	delete(branches, id)
+
 }
 
+// Удаленеие категории
+func DeleteCategory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	id := mux.Vars(r)["id"]
+	delete(categories, id)
+
+}
+
+// Удаление продукта по ID 
+func DeleteProduct(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	id := (mux.Vars(r)["id"])
+	delete(productMap, id)
+	
+}	
+
+
+
+
 func main() {
+	branches = make(map[string]Branch)
+	categories = make(map[string]Category)
+	productMap = make(map[string]Product)
 	r := mux.NewRouter()
 
 	r.HandleFunc("/branch", getBranch).Methods("GET")
@@ -344,5 +260,7 @@ func main() {
 	
 
 	r.HandleFunc("/branch/{id}", DeleteBranch).Methods("DELETE")
+	r.HandleFunc("/categories/{id}", DeleteCategory).Methods("DELETE")
+	r.HandleFunc("/products/{id}", DeleteCategory).Methods("DELETE")
 	log.Fatal(http.ListenAndServe(":8000", r))
 }
