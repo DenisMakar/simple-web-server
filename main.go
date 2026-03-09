@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -55,12 +57,17 @@ func CreateBranch(w http.ResponseWriter, r *http.Request) {
 func CreateCategory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var category Category
-	json.NewDecoder(r.Body).Decode(&category)
+
+	err := json.NewDecoder(r.Body).Decode(&category)
+
+	if err != nil{
+		fmt.Errorf("CreateCategory decode error - %v", err)
+	}
 
 	// проверка существует ли branch с ID
 	branch, exist := branches[category.BranchId]
 	if !exist{
-		http.Error(w, "Branch с ID "+category.BranchId+"не найдено", http.StatusBadRequest)
+		http.Error(w, "Branch с ID "+category.BranchId+" не найдено", http.StatusBadRequest)
 		return
 	}
 
@@ -68,7 +75,6 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 	category.ID = uuid.New().String()
 	categories[category.ID] = category
 
-	// w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(category)
 
 	defer r.Body.Close()
@@ -78,14 +84,16 @@ func CreateCategory(w http.ResponseWriter, r *http.Request) {
 func CreatProduct(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var product Product
-	json.NewDecoder(r.Body).Decode(&product)
 
+	err := json.NewDecoder(r.Body).Decode(&product)
+	if err != nil{
+		fmt.Errorf("CreateProduct decode error - %v", err)
+	}
 	category, exist := categories[product.CategoryId]
 	if !exist{
-		http.Error(w, "Category с ID "+product.CategoryId+"не найдено", http.StatusBadRequest)
+		http.Error(w, "Category с ID "+product.CategoryId+" не найдено", http.StatusBadRequest)
 		return
 	}
-
 
 	product.ID = uuid.New().String()
 	product.Category = &category
@@ -100,39 +108,37 @@ func CreatProduct(w http.ResponseWriter, r *http.Request) {
 func getBranch(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
-	id := params["id"]
-	if id == ""{
+	branchID := params["id"]
+	if branchID == ""{
 		json.NewEncoder(w).Encode(branches)
 	}else{
 		muBranches.RLock()
-		branch, exist := branches[id]
+		branch, exist := branches[branchID]
 		muBranches.RUnlock()
 		if !exist{
-			http.Error(w, "Branch с ID "+id+" не найдено", http.StatusBadRequest)
+			http.Error(w, "Branch с ID "+branchID+" не найдено", http.StatusBadRequest)
 			return
 		}
 		json.NewEncoder(w).Encode(branch)
-		// json.NewEncoder(w).Encode(branches)
-
 		}
 }
 func getCatagory(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
-	id := params["id"]
-	if id == ""{
+	categoryID := params["id"]
+
+	if categoryID == ""{
 		json.NewEncoder(w).Encode(categories)
 	}else{
 			muCategories.RLock()
-			category, exist := categories[id]
+			category, exist := categories[categoryID]
 			muCategories.RUnlock()
 		if !exist{
-			http.Error(w, "Category с ID "+id+" не найдено", http.StatusBadRequest)
+			http.Error(w, "Category с ID "+categoryID+" не найдено", http.StatusBadRequest)
 			return
 		}
 		json.NewEncoder(w).Encode(category)
 	}
-	
 }
 
 // Функция getProduct будет показывать книгу по опрделенному ID
@@ -158,7 +164,13 @@ func UpdateBranch(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 
 	params := mux.Vars(r)
-	id := params["id"]
+	branchID := params["id"]
+
+	branch, exist := branches[branchID]
+	if !exist{
+		http.Error(w, "Branch с ID "+branchID+" не найдено", http.StatusBadRequest)
+		return
+	}
 	
 	var updateBranch Branch
 	if err := json.NewDecoder(r.Body).Decode(&updateBranch); err != nil{
@@ -166,25 +178,26 @@ func UpdateBranch(w http.ResponseWriter, r *http.Request){
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid json"})
 		return
 	} 
-	branch, exist := branches[id]
-	if !exist{
-		http.Error(w, "Branch с ID "+id+" не найдено", http.StatusBadRequest)
-		return
-	}
+	
 	if updateBranch.Name != ""{
 		branch.Name = updateBranch.Name
 	}
 
-	branches[id] = branch
+	branches[branchID] = branch
 	json.NewEncoder(w).Encode(branch)
-	
 }
 
 func UpdateCategory(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 
 	params := mux.Vars(r)
-	id := params["id"]
+	categoryID := params["id"]
+
+	category, exist := categories[categoryID]
+	if !exist{
+		http.Error(w, "Category с ID "+categoryID+" не найдено", http.StatusBadRequest)
+		return
+	}
 
 	var updateCategory Category
 	if err := json.NewDecoder(r.Body).Decode(&updateCategory); err != nil{
@@ -193,12 +206,6 @@ func UpdateCategory(w http.ResponseWriter, r *http.Request){
 		return
 	} 
 
-	category, exist := categories[id]
-	if !exist{
-		http.Error(w, "Category с ID "+id+" не найдено", http.StatusBadRequest)
-		return
-	}
-
 	if category.BranchId != ""{
 		category.BranchId = updateCategory.BranchId
 	}
@@ -206,7 +213,7 @@ func UpdateCategory(w http.ResponseWriter, r *http.Request){
 		category.Name = updateCategory.Name
 	}
 
-	categories[id] = category
+	categories[categoryID] = category
 	json.NewEncoder(w).Encode(category)
 }
 
@@ -214,7 +221,13 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 
 	params := mux.Vars(r)
-	id := params["id"]
+	productID := params["id"]
+
+	product, exist := products[productID]
+	if !exist{
+		http.Error(w, "Product с ID "+productID+" не найдено", http.StatusBadRequest)
+		return
+	}
 
 	var updateProduct Product
 	if err := json.NewDecoder(r.Body).Decode(&updateProduct); err != nil{
@@ -223,12 +236,7 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request){
 		return
 	} 
 	
-	product, exist := products[id]
-	if !exist{
-		http.Error(w, "Product с ID "+id+" не найдено", http.StatusBadRequest)
-		return
-	}
-
+	
 	if product.Name != ""{
 		product.Name = updateProduct.Name
 	}
@@ -242,16 +250,21 @@ func UpdateProduct(w http.ResponseWriter, r *http.Request){
 		product.CategoryId = updateProduct.CategoryId
 	}
 
-	products[id] = product
+	products[productID] = product
 	json.NewEncoder(w).Encode(product)
 }
 
-func DeleteBranch(branchID string) {
+func DeleteBranch(w http.ResponseWriter, r *http.Request) {
 	muBranches.Lock()
 	defer muBranches.Unlock()
 
+	params := mux.Vars(r)
+	branchID := params["id"]
+
 	_, exist := branches[branchID]
 	if !exist{
+		http.Error(w, "Не найдено", http.StatusNotFound)
+		muBranches.Unlock()
 		return
 	}
 
@@ -270,33 +283,49 @@ func DeleteBranch(branchID string) {
 	defer muProducts.Unlock()
 	defer muCategories.Unlock()
 
-	for _, catID := range  categoryDelete{
+	for _, categoryID := range  categoryDelete{
 		for productID, product := range products{
-			if product.CategoryId == catID{
+			if product.CategoryId == categoryID{
 				delete(products, productID)
 			}
 		}
-		delete(categories,catID)
+		delete(categories,categoryID)
 	}
 	delete(branches, branchID)
 }
 
 // Удаленеие категории
 func DeleteCategory(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	muCategories.Lock()
+	defer muCategories.Unlock()
 	
-	id := mux.Vars(r)["id"]
-	delete(categories, id)
+	categoryID := mux.Vars(r)["id"]
+	_, exist := categories[categoryID]
+	if !exist{
+		http.Error(w, "Не найдено", http.StatusNotFound)
+		muBranches.Unlock()
+		return
+	}
 
+	muProducts.RLock()
+	for productID, product := range products{
+		if product.CategoryId == categoryID{
+			delete(products, productID)
+		}
+	}
+	muProducts.RUnlock()
+
+	delete(categories, categoryID)
 }
 
 // Удаление продукта по ID 
 func DeleteProduct(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	
-	id := (mux.Vars(r)["id"])
-	delete(products, id)
-	
+	productID := (mux.Vars(r)["id"])
+	_, exist  := products[productID]
+	if !exist{
+		http.Error(w, "Не найдено", http.StatusNotFound)
+	}
+	delete(products, productID)
 }	
 
 func main() {
