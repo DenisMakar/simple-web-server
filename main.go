@@ -356,4 +356,5 @@ func main() {
 	r.HandleFunc("/category/{id}", DeleteCategory).Methods("DELETE")
 	r.HandleFunc("/product/{id}", DeleteProduct).Methods("DELETE")
 	log.Fatal(http.ListenAndServe(":8000", r))
+	fmt.Println("Старт программы")
 }
