@@ -122,7 +122,7 @@ func getBranch(w http.ResponseWriter, r *http.Request){
 		json.NewEncoder(w).Encode(branch)
 		}
 }
-func getCatagory(w http.ResponseWriter, r *http.Request){
+func getCategory(w http.ResponseWriter, r *http.Request){
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
 	categoryID := params["id"]
@@ -150,7 +150,7 @@ func getProduct(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(products)
 	}else{
 		muProducts.RLock()
-		product, exist := categories[id]
+		product, exist := products[id]
 		muProducts.RUnlock()
 		if !exist{
 			http.Error(w, "Product с ID "+id+"не найдено", http.StatusBadRequest)
@@ -303,7 +303,6 @@ func DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	_, exist := categories[categoryID]
 	if !exist{
 		http.Error(w, "Не найдено", http.StatusNotFound)
-		muBranches.Unlock()
 		return
 	}
 
@@ -337,12 +336,12 @@ func main() {
 
 	r.HandleFunc("/branch", getBranch).Methods("GET")
 	r.HandleFunc("/branch/{id}", getBranch).Methods("GET")
-	r.HandleFunc("/category", getCatagory).Methods("GET")
-	r.HandleFunc("/category/{id}", getCatagory).Methods("GET")
+	r.HandleFunc("/category", getCategory).Methods("GET")
+	r.HandleFunc("/category/{id}", getCategory).Methods("GET")
 	r.HandleFunc("/product", getProduct).Methods("GET")
 	r.HandleFunc("/product/{id}", getProduct).Methods("GET")
 	r.HandleFunc("/branch/{id}/category", getBranch).Methods("GET")
-	r.HandleFunc("/category/{id}/product", getCatagory).Methods("GET")
+	r.HandleFunc("/category/{id}/product", getCategory).Methods("GET")
 
 	r.HandleFunc("/branch", CreateBranch).Methods("POST")
 	r.HandleFunc("/category", CreateCategory).Methods("POST")
@@ -355,6 +354,6 @@ func main() {
 
 	r.HandleFunc("/branch/{id}", DeleteBranch).Methods("DELETE")
 	r.HandleFunc("/category/{id}", DeleteCategory).Methods("DELETE")
-	r.HandleFunc("/product/{id}", DeleteCategory).Methods("DELETE")
+	r.HandleFunc("/product/{id}", DeleteProduct).Methods("DELETE")
 	log.Fatal(http.ListenAndServe(":8000", r))
 }
