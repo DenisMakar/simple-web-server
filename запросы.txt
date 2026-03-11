@@ -1,0 +1,22 @@
+branch
+{
+    "name": "Электроника"
+    "branchId": 790278
+}
+
+
+
+Category
+{
+    "name": "Электроника",
+    "branchId": 857601
+}
+
+
+Product
+{
+
+    "name": "Электроника",
+    "categoryId": 497333
+
+}
